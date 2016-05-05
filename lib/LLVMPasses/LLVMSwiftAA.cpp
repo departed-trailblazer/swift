@@ -72,8 +72,7 @@ SwiftAAWrapperPass::SwiftAAWrapperPass() : ImmutablePass(ID) {
 }
 
 bool SwiftAAWrapperPass::doInitialization(Module &M) {
-  Result.reset(new SwiftAAResult(
-      getAnalysis<TargetLibraryInfoWrapperPass>().getTLI()));
+  Result.reset(new SwiftAAResult());
   return false;
 }
 
@@ -84,7 +83,6 @@ bool SwiftAAWrapperPass::doFinalization(Module &M) {
 
 void SwiftAAWrapperPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
-  AU.addRequired<TargetLibraryInfoWrapperPass>();
 }
 
 //===----------------------------------------------------------------------===//
