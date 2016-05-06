@@ -4,7 +4,11 @@
 // RUN: ls %t/Swift.swiftmodule
 // RUN: ls %t/Swift.swiftdoc
 // RUN: ls %t/Swift.o
+// RUN: %target-clang -x c -c %S/RuntimeStubs.c -o %t/RuntimeStubs.o
+// RUN: %target-build-swift -I %t -module-name main -o %t/hello %S/main.swift %t/Swift.o %t/RuntimeStubs.o
+// RUN: %target-run %t/hello | FileCheck %s
 // REQUIRES: executable_test
+// CHECK: Hello
 
 //
 // A bare-bones Swift standard library
@@ -89,6 +93,18 @@ public struct UnsafeMutablePointer<T> {
 
 public typealias CInt = Int32
 public typealias CChar = Int8
+
+@_silgen_name("putchar")
+public func putchar(_: CChar)
+
+public func printHello() {
+  putchar(0x48)
+  putchar(0x65)
+  putchar(0x6c)
+  putchar(0x6c)
+  putchar(0x6f)
+  putchar(0x0a)
+}
 
 //public var C_ARGC: CInt = CInt()
 
