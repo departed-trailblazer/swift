@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -15,6 +15,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if __has_include(<unistd.h>)
+#include <unistd.h>
+#endif
+
+#if defined(_POSIX_THREADS) && !defined(SWIFT_STDLIB_SINGLE_THREADED_RUNTIME)
 #include "swift/Runtime/Mutex.h"
 
 #include "swift/Runtime/Debug.h"
@@ -109,6 +114,29 @@ bool MutexPlatformHelper::try_lock(pthread_mutex_t &mutex) {
                           /* returnFalseOnEBUSY = */ true);
 }
 
+#if HAS_OS_UNFAIR_LOCK
+
+void MutexPlatformHelper::init(os_unfair_lock &lock, bool checked) {
+  (void)checked; // Unfair locks are always checked.
+  lock = OS_UNFAIR_LOCK_INIT;
+}
+
+void MutexPlatformHelper::destroy(os_unfair_lock &lock) {}
+
+void MutexPlatformHelper::lock(os_unfair_lock &lock) {
+  os_unfair_lock_lock(&lock);
+}
+
+void MutexPlatformHelper::unlock(os_unfair_lock &lock) {
+  os_unfair_lock_unlock(&lock);
+}
+
+bool MutexPlatformHelper::try_lock(os_unfair_lock &lock) {
+  return os_unfair_lock_trylock(&lock);
+}
+
+#endif
+
 void ReadWriteLockPlatformHelper::init(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_init(&rwlock, nullptr));
 }
@@ -142,3 +170,4 @@ void ReadWriteLockPlatformHelper::readUnlock(pthread_rwlock_t &rwlock) {
 void ReadWriteLockPlatformHelper::writeUnlock(pthread_rwlock_t &rwlock) {
   reportError(pthread_rwlock_unlock(&rwlock));
 }
+#endif

@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 struct S {
   func foo() {
@@ -49,13 +49,22 @@ class Y<U> : X<Int> {
 }
 
 func use_d(_ d: D) -> Int {
-  d.b_foo()
-  d.bar(1.0)
-  d.bas()
+  _ = d.b_foo()
+  _ = d.bar(1.0)
+  _ = d.bas()
 
   return d.zippity
 }
 
 func not_method() {
   super.foo() // expected-error{{'super' cannot be used outside of class members}}
+}
+
+// rdar://problem/50819554 - inability to properly resolve superclass shouldn't crash the solver
+func test_that_invalid_supertype_ref_doesnt_crash() {
+  final class Node: ManagedBuffer<AnyObject, Undefined> { // expected-error {{cannot find type 'Undefined' in scope}}
+    static func create() {
+      super.create()
+    }
+  }
 }

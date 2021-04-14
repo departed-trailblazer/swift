@@ -1,45 +1,8 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_1 | FileCheck %s -check-prefix=KW_DECL_STMT
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_1 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_2 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_3 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_4 | FileCheck %s -check-prefix=KW_DECL_STMT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FUNC_BODY_5 | FileCheck %s -check-prefix=KW_DECL_STMT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_1 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_2 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_3 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_4 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_5 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_6 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_7 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_8 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_9 | FileCheck %s -check-prefix=KW_DECL
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_NOMINAL_DECL_10 | FileCheck %s -check-prefix=KW_DECL
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD0 | FileCheck %s -check-prefix=SUPER_KEYWORD0
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD1 | FileCheck %s -check-prefix=SUPER_KEYWORD1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD2 | FileCheck %s -check-prefix=SUPER_KEYWORD2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SUPER_KEYWORD3 | FileCheck %s -check-prefix=SUPER_KEYWORD3
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_1 > %t.expr1
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr1
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_2 > %t.expr2
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr2
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr2
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_3 > %t.expr3
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr3
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr3
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_4 > %t.expr4
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr4
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr4
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_5 > %t.expr5
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr5
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr5
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_6 > %t.expr6
-// RUN: FileCheck %s -check-prefix=KW_EXPR < %t.expr6
-// RUN: FileCheck %s -check-prefix=KW_EXPR_NEG < %t.expr6
+// KW_RETURN: Keyword[return]/None: return{{; name=.+$}}
+// KW_NO_RETURN-NOT: Keyword[return]
 
 // KW_DECL: Begin completions
 // KW_DECL-DAG: Keyword[class]/None: class{{; name=.+$}}
@@ -121,7 +84,6 @@
 // KW_DECL_STMT-DAG: Keyword[for]/None: for{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[in]/None: in{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[while]/None: while{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[return]/None: return{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[break]/None: break{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[continue]/None: continue{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[fallthrough]/None: fallthrough{{; name=.+$}}
@@ -137,10 +99,10 @@
 // KW_DECL_STMT-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_DECL_STMT-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// KW_DECL_STMT-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// KW_DECL_STMT-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // Literals
 //
@@ -157,10 +119,10 @@
 // KW_EXPR-DAG: Keyword[try]/None: try{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try!{{; name=.+$}}
 // KW_EXPR-DAG: Keyword[try]/None: try?{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// KW_EXPR-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// KW_EXPR-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 //
 // let and var
 //
@@ -169,8 +131,8 @@
 //
 // Literals
 //
-// KW_EXPR-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
-// KW_EXPR-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Boolean]/None{{(/TypeRelation\[Identical\])?}}: false[#Bool#]{{; name=.+$}}
+// KW_EXPR-DAG: Literal[Boolean]/None{{(/TypeRelation\[Identical\])?}}: true[#Bool#]{{; name=.+$}}
 // KW_EXPR-DAG: Literal[Nil]/None: nil{{; name=.+$}}
 // KW_EXPR: End completions
 
@@ -178,91 +140,128 @@
 //
 // Declaration keywords
 //
-// KW_EXPR_NEG-NOT: class
-// KW_EXPR_NEG-NOT: convenience
-// KW_EXPR_NEG-NOT: mutating
-// KW_EXPR_NEG-NOT: weak
+// KW_EXPR_NEG-NOT: Keyword{{.*}}class
+// KW_EXPR_NEG-NOT: Keyword{{.*}}convenience
+// KW_EXPR_NEG-NOT: Keyword{{.*}}mutating
+// KW_EXPR_NEG-NOT: Keyword{{.*}}weak
 //
 // Statement keywords
 //
 // KW_EXPR_NEG-NOT: Keyword{{.*}}throw
-// KW_EXPR_NEG-NOT: while
-// KW_EXPR_NEG-NOT: switch
-// KW_EXPR_NEG-NOT: catch
-// KW_EXPR_NEG-NOT: break
+// KW_EXPR_NEG-NOT: Keyword{{.*}}while
+// KW_EXPR_NEG-NOT: Keyword{{.*}}switch
+// KW_EXPR_NEG-NOT: Keyword{{.*}}catch
+// KW_EXPR_NEG-NOT: Keyword{{.*}}break
 // KW_EXPR_NEG: End completions
 
-#^TOP_LEVEL_1^#
+#^TOP_LEVEL_1?check=KW_DECL_STMT;check=KW_NO_RETURN^#
+
+for _ in 1...10 {
+  #^TOP_LEVEL_2?check=KW_DECL_STMT;check=KW_NO_RETURN^#
+}
+
+if true {} #^TOP_LEVEL_AFTER_IF_1?check=KW_DECL_STMT;check=KW_NO_RETURN^#
+
+if true {} else #^TOP_LEVEL_AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
+
+// AFTER_IF_ELSE: Begin completions, 1 items
+// AFTER_IF_ELSE: Keyword[if]/None: if;
+
+func testAfterIf1() {
+  if true {} #^AFTER_IF_1?check=KW_DECL_STMT;check=KW_RETURN^#
+}
+func testAfterIfElse1() {
+  if true {} else #^AFTER_IF_ELSE_1?check=AFTER_IF_ELSE^# {}
+}
 
 func testInFuncBody1() {
-  #^IN_FUNC_BODY_1^#
+  #^IN_FUNC_BODY_1?check=KW_DECL_STMT;check=KW_RETURN^#
 }
 
 struct InStructFunc {
   func testInFuncBody2() {
-    #^IN_FUNC_BODY_2^#
+    #^IN_FUNC_BODY_2?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 enum InEnumFunc {
   func testInFuncBody3() {
-    #^IN_FUNC_BODY_3^#
+    #^IN_FUNC_BODY_3?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 class InClassFunc {
   func testInFuncBody4() {
-    #^IN_FUNC_BODY_4^#
+    #^IN_FUNC_BODY_4?check=KW_DECL_STMT;check=KW_RETURN^#
   }
 }
 
 class InClassFunc {
   class Nested {
     func testInFuncBody5() {
-      #^IN_FUNC_BODY_5^#
+      #^IN_FUNC_BODY_5?check=KW_DECL_STMT;check=KW_RETURN^#
     }
   }
 }
 
+func testInClosure1() {
+  { #^IN_CLOSURE_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+}
+func testInClosure2() {
+  { #^IN_CLOSURE_2?check=KW_DECL_STMT;check=KW_RETURN^#
+}
+struct InVarClosureInit {
+  let x = { #^IN_CLOSURE_3?check=KW_DECL_STMT;check=KW_RETURN^# }()
+}
+
+{ #^IN_CLOSURE_4?check=KW_DECL_STMT;check=KW_RETURN^# }
+
+struct InSubscript {
+  subscript(x: Int) -> Int { #^IN_SUBSCRIPT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+}
+
+struct InInit {
+  init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN^# }
+}
 
 struct InStruct {
-  #^IN_NOMINAL_DECL_1^#
+  #^IN_NOMINAL_DECL_1?check=KW_DECL^#
 }
 
 enum InEnum {
-  #^IN_NOMINAL_DECL_2^#
+  #^IN_NOMINAL_DECL_2?check=KW_DECL^#
 }
 
 class InClass {
-  #^IN_NOMINAL_DECL_3^#
+  #^IN_NOMINAL_DECL_3?check=KW_DECL^#
 }
 
 protocol InProtocol {
-  #^IN_NOMINAL_DECL_4^#
+  #^IN_NOMINAL_DECL_4?check=KW_DECL^#
 }
 
 struct AfterOtherKeywords1 {
-  public #^IN_NOMINAL_DECL_5^#
+  public #^IN_NOMINAL_DECL_5?check=KW_DECL^#
 }
 
 struct AfterOtherKeywords2 {
-  mutating #^IN_NOMINAL_DECL_6^#
+  mutating #^IN_NOMINAL_DECL_6?check=KW_DECL^#
 }
 
 class AfterOtherKeywords3 {
-  override #^IN_NOMINAL_DECL_7^#
+  override #^IN_NOMINAL_DECL_7?check=KW_DECL^#
 }
 
 class AfterOtherKeywords4 {
-  public override #^IN_NOMINAL_DECL_8^#
+  public override #^IN_NOMINAL_DECL_8?check=KW_DECL^#
 }
 
 extension InStruct {
-  #^IN_NOMINAL_DECL_9^#
+  #^IN_NOMINAL_DECL_9?check=KW_DECL^#
 }
 
 extension InProtocol {
-  #^IN_NOMINAL_DECL_10^#
+  #^IN_NOMINAL_DECL_10?check=KW_DECL^#
 }
 
 class SuperSuperClass {
@@ -294,22 +293,54 @@ extension SubClass {
 }
 
 func inExpr1() {
-  (#^EXPR_1^#)
+  (#^EXPR_1?check=KW_EXPR;check=KW_EXPR_NEG^#)
 }
 func inExpr2() {
-  let x = #^EXPR_2^#
+  let x = #^EXPR_2?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr3() {
-  if #^EXPR_3^# {}
+  if #^EXPR_3?check=KW_EXPR;check=KW_EXPR_NEG^# {}
 }
 func inExpr4() {
   let x = 1
-  x + #^EXPR_4^#
+  x + #^EXPR_4?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr5() {
   var x: Int
-  x = #^EXPR_5^#
+  x = #^EXPR_5?check=KW_EXPR;check=KW_EXPR_NEG^#
 }
 func inExpr6() -> Int {
-  return #^EXPR_6^#
+  return #^EXPR_6?check=KW_EXPR;check=KW_EXPR_NEG^#
+}
+
+func inSwitch(val: Int) {
+  switch val {
+  #^SWITCH_TOP?check=KW_CASE^#
+  case 1:
+    foo()
+  #^SWITCH_IN_CASE?check=KW_CASE^#
+  }
+// KW_CASE: Begin completions
+// KW_CASE-DAG: Keyword[case]/None:                 case; name=case
+// KW_CASE-DAG: Keyword[default]/None:              default; name=default
+// KW_CASE: End completions
+}
+func testContextualType() {
+  let _: UInt32 = #^CONTEXT_UINT32^#
+// CONTEXT_UINT32: Begin completions
+// CONTEXT_UINT32-DAG: Keyword[#function]/None:            #function[#String#]; name=#function
+// CONTEXT_UINT32-DAG: Keyword[#file]/None:                #file[#String#]; name=#file
+// CONTEXT_UINT32-DAG: Keyword[#line]/None/TypeRelation[Identical]: #line[#UInt32#]; name=#line
+// CONTEXT_UINT32-DAG: Keyword[#column]/None/TypeRelation[Identical]: #column[#UInt32#]; name=#column
+// CONTEXT_UINT32-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
+// CONTEXT_UINT32: End completions
+
+  let _: StaticString = #^CONTEXT_STATICSTRING^#
+// CONTEXT_STATICSTRING: Begin completions
+// CONTEXT_STATICSTRING-DAG: Keyword[#function]/None/TypeRelation[Identical]: #function[#StaticString#]; name=#function
+// CONTEXT_STATICSTRING-DAG: Keyword[#file]/None/TypeRelation[Identical]: #file[#StaticString#]; name=#file
+// CONTEXT_STATICSTRING-DAG: Keyword[#line]/None:                #line[#Int#]; name=#line
+// CONTEXT_STATICSTRING-DAG: Keyword[#column]/None:              #column[#Int#]; name=#column
+// CONTEXT_STATICSTRING-DAG: Keyword[#dsohandle]/None:           #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
+// CONTEXT_STATICSTRING: End completions
 }

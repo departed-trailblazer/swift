@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift
+// RUN: %target-typecheck-verify-swift
 
 // REQUIRES: objc_interop
 
@@ -6,7 +6,7 @@
 public extension _ObjectiveCBridgeable {
   static func _unconditionallyBridgeFromObjectiveC(_ source: _ObjectiveCType?)
       -> Self {
-    var result: Self? = nil
+    var result: Self?
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
@@ -17,10 +17,6 @@ class A {
 }
 
 struct B : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> A {
     return A()
   }
@@ -40,14 +36,18 @@ struct B : _ObjectiveCBridgeable {
 var a: [A] = []
 var b: [B] = []
 
-a = b
+a = b as [A]
 
 b = a // expected-error {{cannot assign value of type '[A]' to type '[B]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('A' and 'B') are expected to be equal}}
 
 var aa: [[A]] = []
 var bb: [[B]] = []
 
 aa = bb // expected-error {{cannot assign value of type '[[B]]' to type '[[A]]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('B' and 'A') are expected to be equal}}
+bb = aa // expected-error {{cannot assign value of type '[[A]]' to type '[[B]]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('A' and 'B') are expected to be equal}}
 
 class C {
 }
@@ -58,10 +58,6 @@ class E {
 }
 
 struct F : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> E {
     return E()
   }
@@ -81,8 +77,9 @@ struct F : _ObjectiveCBridgeable {
 var e: [E] = []
 var f: [F] = []
 
-e = f
+e = f as [E]
 f = e // expected-error {{cannot assign value of type '[E]' to type '[F]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('E' and 'F') are expected to be equal}}
 
 class G {
   var x = 0
@@ -103,22 +100,15 @@ struct H : _ObjectiveCBridgeable {
   ) -> Bool {
     return true
   }
-  static func _isBridgedToObjectiveC() -> Bool {
-    return false
-  }
 }
 
 var g: [G] = []
 var h: [H] = []
 
-g = h // should type check, but cause a failure at runtime
+g = h as [G] // should type check, but cause a failure at runtime
 
 
 struct I : _ObjectiveCBridgeable {
-  static func _isBridgedToObjectiveC() -> Bool {
-    return true
-  }
-  
   func _bridgeToObjectiveC() -> AnyObject {
     return A()
   }
@@ -138,5 +128,6 @@ struct I : _ObjectiveCBridgeable {
 var aoa: [AnyObject] = []
 var i: [I] = []
 
-aoa = i
+aoa = i as [AnyObject]
 i = aoa // expected-error {{cannot assign value of type '[AnyObject]' to type '[I]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('AnyObject' and 'I') are expected to be equal}}

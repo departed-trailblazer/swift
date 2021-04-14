@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -16,67 +16,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-// FIXME: Make this work with Linux
-
-import MachO
-import Darwin
-
 let RequestInstanceKind = "k"
 let RequestInstanceAddress = "i"
 let RequestReflectionInfos = "r"
-let RequestReadBytes = "b";
+let RequestImages = "m"
+let RequestReadBytes = "b"
 let RequestSymbolAddress = "s"
 let RequestStringLength = "l"
 let RequestDone = "d"
 let RequestPointerSize = "p"
 
-internal func debugLog(_ message: String) {
-#if DEBUG_LOG
-  fputs("Child: \(message)\n", stderr)
-  fflush(stderr)
-#endif
-}
 
-public enum InstanceKind : UInt8 {
-  case None
-  case Object
-  case Existential
-  case Closure
-}
-
-/// Represents a section in a loaded image in this process.
-internal struct Section {
-  /// The absolute start address of the section's data in this address space.
-  let startAddress: UnsafePointer<Void>
-
-  /// The size of the section in bytes.
-  let size: UInt
-}
-
-/// Holds the addresses and sizes of sections related to reflection
-internal struct ReflectionInfo : Sequence {
-  /// The name of the loaded image
-  internal let imageName: String
-
-  /// Reflection metadata sections
-  internal let fieldmd: Section?
-  internal let assocty: Section?
-  internal let builtin: Section?
-  internal let capture: Section?
-  internal let typeref: Section?
-  internal let reflstr: Section?
-
-  internal func makeIterator() -> AnyIterator<Section?> {
-    return AnyIterator([
-      fieldmd,
-      assocty,
-      builtin,
-      capture,
-      typeref,
-      reflstr
-    ].makeIterator())
-  }
-}
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import MachO
+import Darwin
 
 #if arch(x86_64) || arch(arm64)
 typealias MachHeader = mach_header_64
@@ -101,16 +54,46 @@ internal func getSectionInfo(_ name: String,
   return Section(startAddress: nonNullAddress, size: size)
 }
 
+/// Get the TEXT segment location and size for a loaded image.
+///
+/// - Parameter i: The index of the loaded image as reported by Dyld.
+/// - Returns: The image name, address, and size.
+internal func getAddressInfoForImage(atIndex i: UInt32) ->
+        (name: String, address: UnsafeMutablePointer<UInt8>?, size: UInt) {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let header = unsafeBitCast(_dyld_get_image_header(i),
+          to: UnsafePointer<MachHeader>.self)
+  let name = String(validatingUTF8: _dyld_get_image_name(i)!)!
+  var size: UInt = 0
+  let address = getsegmentdata(header, "__TEXT", &size)
+  return (name, address, size)
+}
+
+/// Send all loadedimages loaded in the current process.
+internal func sendImages() {
+  debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
+  let infos = (0..<getImageCount()).map(getAddressInfoForImage)
+
+  debugLog("\(infos.count) reflection info bundles.")
+  precondition(infos.count >= 1)
+  sendValue(infos.count)
+  for (name, address, size) in infos {
+    debugLog("Sending info for \(name)")
+    sendValue(address)
+    sendValue(size)
+  }
+}
+
 /// Get the Swift Reflection section locations for a loaded image.
 ///
-/// An image of interest must have the following sections in the __DATA
+/// An image of interest must have the following sections in the __TEXT
 /// segment:
-/// - __swift3_fieldmd
-/// - __swift3_assocty
-/// - __swift3_builtin
-/// - __swift3_capture
-/// - __swift3_typeref
-/// - __swift3_reflstr (optional, may have been stripped out)
+/// - __swift5_fieldmd
+/// - __swift5_assocty
+/// - __swift5_builtin
+/// - __swift5_capture
+/// - __swift5_typeref
+/// - __swift5_reflstr (optional, may have been stripped out)
 ///
 /// - Parameter i: The index of the loaded image as reported by Dyld.
 /// - Returns: A `ReflectionInfo` containing the locations of all of the
@@ -121,25 +104,120 @@ internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
     to: UnsafePointer<MachHeader>.self)
 
   let imageName = _dyld_get_image_name(i)!
-  if let fieldmd = getSectionInfo("__swift3_fieldmd", header) {
-      let assocty = getSectionInfo("__swift3_assocty", header)
-      let builtin = getSectionInfo("__swift3_builtin", header)
-      let capture = getSectionInfo("__swift3_capture", header)
-      let typeref = getSectionInfo("__swift3_typeref", header)
-      let reflstr = getSectionInfo("__swift3_reflstr", header)
-      return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
-                            fieldmd: fieldmd,
-                            assocty: assocty,
-                            builtin: builtin,
-                            capture: capture,
-                            typeref: typeref,
-                            reflstr: reflstr)
+  let fieldmd = getSectionInfo("__swift5_fieldmd", header)
+  let assocty = getSectionInfo("__swift5_assocty", header)
+  let builtin = getSectionInfo("__swift5_builtin", header)
+  let capture = getSectionInfo("__swift5_capture", header)
+  let typeref = getSectionInfo("__swift5_typeref", header)
+  let reflstr = getSectionInfo("__swift5_reflstr", header)
+  return ReflectionInfo(imageName: String(validatingUTF8: imageName)!,
+                        fieldmd: fieldmd,
+                        assocty: assocty,
+                        builtin: builtin,
+                        capture: capture,
+                        typeref: typeref,
+                        reflstr: reflstr)
+}
+
+internal func getImageCount() -> UInt32 {
+  return _dyld_image_count()
+}
+
+let rtldDefault = UnsafeMutableRawPointer(bitPattern: Int(-2))
+#elseif !os(Windows)
+import SwiftShims
+import Glibc
+
+let rtldDefault: UnsafeMutableRawPointer? = nil
+
+extension Section {
+  init(range: MetadataSectionRange) {
+    self.startAddress = UnsafeRawPointer(bitPattern: range.start)!
+    self.size = UInt(range.length)
   }
-  return nil
+}
+
+internal func getReflectionInfoForImage(atIndex i: UInt32) -> ReflectionInfo? {
+  return _getMetadataSection(UInt(i)).map { rawPointer in
+    let name = _getMetadataSectionName(rawPointer)
+    let metadataSection = rawPointer.bindMemory(to: MetadataSections.self, capacity: 1).pointee
+    return ReflectionInfo(imageName: String(validatingUTF8: name)!,
+            fieldmd: Section(range: metadataSection.swift5_fieldmd),
+            assocty: Section(range: metadataSection.swift5_assocty),
+            builtin: Section(range: metadataSection.swift5_builtin),
+            capture: Section(range: metadataSection.swift5_capture),
+            typeref: Section(range: metadataSection.swift5_typeref),
+            reflstr: Section(range: metadataSection.swift5_reflstr))
+  }
+}
+
+internal func getImageCount() -> UInt32 {
+  return UInt32(_getMetadataSectionCount())
+}
+
+internal func sendImages() {
+  preconditionFailure("Should only be called in macOS!")
+}
+
+
+#else // os(Linux)
+#error("SwiftReflectionTest does not currently support this OS.")
+#endif
+
+internal func debugLog(_ message: @autoclosure () -> String) {
+#if DEBUG_LOG
+  fputs("Child: \(message())\n", stderr)
+  fflush(stderr)
+#endif
+}
+
+public enum InstanceKind: UInt8 {
+  case None
+  case Object
+  case Existential
+  case ErrorExistential
+  case Closure
+  case Enum
+  case EnumValue
+  case AsyncTask
+}
+
+/// Represents a section in a loaded image in this process.
+internal struct Section {
+  /// The absolute start address of the section's data in this address space.
+  let startAddress: UnsafeRawPointer
+
+  /// The size of the section in bytes.
+  let size: UInt
+}
+
+/// Holds the addresses and sizes of sections related to reflection.
+internal struct ReflectionInfo : Sequence {
+  /// The name of the loaded image.
+  internal let imageName: String
+
+  /// Reflection metadata sections.
+  internal let fieldmd: Section?
+  internal let assocty: Section?
+  internal let builtin: Section?
+  internal let capture: Section?
+  internal let typeref: Section?
+  internal let reflstr: Section?
+
+  internal func makeIterator() -> AnyIterator<Section?> {
+    return AnyIterator([
+      fieldmd,
+      assocty,
+      builtin,
+      capture,
+      typeref,
+      reflstr
+    ].makeIterator())
+  }
 }
 
 internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
-  var source = address
+  var source = UnsafeRawPointer(address)
   var bytesLeft = count
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   while bytesLeft > 0 {
@@ -157,22 +235,22 @@ internal func sendBytes<T>(from address: UnsafePointer<T>, count: Int) {
 internal func sendAddress(of instance: AnyObject) {
   debugLog("BEGIN \(#function)")
   defer { debugLog("END \(#function)") }
-  var address = unsafeAddress(of: instance)
-  sendBytes(from: &address, count: sizeof(UInt.self))
+  var address = Unmanaged.passUnretained(instance).toOpaque()
+  sendBytes(from: &address, count: MemoryLayout<UInt>.size)
 }
 
 /// Send the `value`'s bits to the parent.
 internal func sendValue<T>(_ value: T) {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value = value
-  sendBytes(from: &value, count: sizeof(T.self))
+  sendBytes(from: &value, count: MemoryLayout<T>.size)
 }
 
 /// Read a word-sized unsigned integer from the parent.
 internal func readUInt() -> UInt {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   var value: UInt = 0
-  fread(&value, sizeof(UInt.self), 1, stdin)
+  fread(&value, MemoryLayout<UInt>.size, 1, stdin)
   return value
 }
 
@@ -180,12 +258,12 @@ internal func readUInt() -> UInt {
 /// process.
 internal func sendReflectionInfos() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let infos = (0..<_dyld_image_count()).flatMap(getReflectionInfoForImage)
+  let infos = (0..<getImageCount()).compactMap(getReflectionInfoForImage)
 
   var numInfos = infos.count
   debugLog("\(numInfos) reflection info bundles.")
   precondition(numInfos >= 1)
-  sendBytes(from: &numInfos, count: sizeof(UInt.self))
+  sendBytes(from: &numInfos, count: MemoryLayout<UInt>.size)
   for info in infos {
     debugLog("Sending info for \(info.imageName)")
     for section in info {
@@ -212,7 +290,7 @@ internal func sendBytes() {
   let count = Int(readUInt())
   debugLog("Parent requested \(count) bytes from \(address)")
   var totalBytesWritten = 0
-  var pointer = unsafeBitCast(address, to: UnsafeMutablePointer<Void>.self)
+  var pointer = UnsafeMutableRawPointer(bitPattern: address)
   while totalBytesWritten < count {
     let bytesWritten = Int(fwrite(pointer, 1, Int(count), stdout))
     fflush(stdout)
@@ -220,7 +298,7 @@ internal func sendBytes() {
       printErrnoAndExit()
     }
     totalBytesWritten += bytesWritten
-    pointer = pointer.advanced(by: bytesWritten)
+    pointer = pointer?.advanced(by: bytesWritten)
   }
 }
 
@@ -229,8 +307,7 @@ internal func sendSymbolAddress() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let name = readLine()!
   name.withCString {
-    let handle = unsafeBitCast(Int(-2), to: UnsafeMutablePointer<Void>.self)
-    let symbol = dlsym(handle, $0)
+    let symbol = dlsym(rtldDefault, $0)
     let symbolAddress = unsafeBitCast(symbol, to: UInt.self)
     sendValue(symbolAddress)
   }
@@ -240,15 +317,18 @@ internal func sendSymbolAddress() {
 internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
-  let cString = unsafeBitCast(address, to: UnsafePointer<CChar>.self)
-  let count = String(validatingUTF8: cString)!.utf8.count
+  let cString = UnsafePointer<CChar>(bitPattern: address)!
+  var count = 0
+  while cString[count] != CChar(0) {
+    count = count + 1
+  }
   sendValue(count)
 }
 
 /// Send the size of this architecture's pointer type.
 internal func sendPointerSize() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
-  let pointerSize = UInt8(sizeof(UnsafePointer<Void>.self))
+  let pointerSize = UInt8(MemoryLayout<UnsafeRawPointer>.size)
   sendValue(pointerSize)
 }
 
@@ -257,8 +337,7 @@ internal func sendPointerSize() {
 /// This is the main "run loop" of the test harness.
 ///
 /// The parent will necessarily need to:
-/// - Get the addresses of all of the reflection sections for any swift dylibs
-///   that are loaded, where applicable.
+/// - Get the addresses of any swift dylibs that are loaded, where applicable.
 /// - Get the address of the `instance`
 /// - Get the pointer size of this process, which affects assumptions about the
 ///   the layout of runtime structures with pointer-sized fields.
@@ -276,6 +355,8 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
       sendValue(instanceAddress)
     case String(validatingUTF8: RequestReflectionInfos)!:
       sendReflectionInfos()
+    case String(validatingUTF8: RequestImages)!:
+      sendImages()
     case String(validatingUTF8: RequestReadBytes)!:
       sendBytes()
     case String(validatingUTF8: RequestSymbolAddress)!:
@@ -283,9 +364,9 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
     case String(validatingUTF8: RequestStringLength)!:
       sendStringLength()
     case String(validatingUTF8: RequestPointerSize)!:
-      sendPointerSize();
+      sendPointerSize()
     case String(validatingUTF8: RequestDone)!:
-      return;
+      return
     default:
       fatalError("Unknown request received: '\(Array(command.utf8))'!")
     }
@@ -293,13 +374,20 @@ internal func reflect(instanceAddress: UInt, kind: InstanceKind) {
 }
 
 /// Reflect a class instance.
+///
+/// This reflects the stored properties of the immediate class.
+/// The superclass is not (yet?) visited.
 public func reflect(object: AnyObject) {
-  let address = unsafeAddress(of: object)
-  let addressValue = unsafeBitCast(address, to: UInt.self)
+  defer { _fixLifetime(object) }
+  let address = Unmanaged.passUnretained(object).toOpaque()
+  let addressValue = UInt(bitPattern: address)
   reflect(instanceAddress: addressValue, kind: .Object)
 }
 
 /// Reflect any type at all by boxing it into an existential container (an `Any`)
+///
+/// Given a class, this will reflect the reference value, and not the contents
+/// of the instance. Use `reflect(object:)` for that.
 ///
 /// This function serves to exercise the projectExistential function of the
 /// SwiftRemoteMirror API.
@@ -349,19 +437,159 @@ public func reflect(object: AnyObject) {
 /// The test doesn't care about the witness tables - we only care
 /// about what's in the buffer, so we always put these values into
 /// an Any existential.
-public func reflect<T>(any: T) {
+public func reflect<T>(any: T, kind: InstanceKind = .Existential) {
   let any: Any = any
-  let anyPointer = UnsafeMutablePointer<Any>(allocatingCapacity: sizeof(Any.self))
-  anyPointer.initialize(with: any)
-  let anyPointerValue = unsafeBitCast(anyPointer, to: UInt.self)
-  reflect(instanceAddress: anyPointerValue, kind: .Existential)
-  anyPointer.deallocateCapacity(sizeof(Any.self))
+  let anyPointer = UnsafeMutablePointer<Any>.allocate(capacity: MemoryLayout<Any>.size)
+  anyPointer.initialize(to: any)
+  let anyPointerValue = UInt(bitPattern: anyPointer)
+  reflect(instanceAddress: anyPointerValue, kind: kind)
+  anyPointer.deallocate()
+}
+
+// Reflect an `Error`, a.k.a. an "error existential".
+//
+// These are always boxed on the heap, with the following layout:
+//
+// - Word 0: Metadata Pointer
+// - Word 1: 2x 32-bit reference counts
+//
+// If Objective-C interop is available, an Error is also an
+// `NSError`, and so has:
+//
+// - Word 2: code (NSInteger)
+// - Word 3: domain (NSString *)
+// - Word 4: userInfo (NSDictionary *)
+//
+// Then, always follow:
+//
+// - Word 2 or 5: Instance type metadata pointer
+// - Word 3 or 6: Instance witness table for conforming
+//   to `Swift.Error`.
+//
+// Following that is the instance that conforms to `Error`,
+// rounding up to its alignment.
+public func reflect<T: Error>(error: T) {
+  let error: Error = error
+  let errorPointerValue = unsafeBitCast(error, to: UInt.self)
+  reflect(instanceAddress: errorPointerValue, kind: .ErrorExistential)
+}
+
+// Reflect an `Enum`
+//
+// These are handled like existentials, but
+// the test driver verifies a different set of data.
+public func reflect<T>(enum value: T) {
+  reflect(any: value, kind: .Enum)
+}
+
+public func reflect<T>(enumValue value: T) {
+  reflect(any: value, kind: .EnumValue)
+}
+
+/// Wraps a thick function with arity 0.
+struct ThickFunction0 {
+  var function: () -> Void
+}
+
+/// Wraps a thick function with arity 1.
+struct ThickFunction1 {
+  var function: (Int) -> Void
+}
+
+/// Wraps a thick function with arity 2.
+struct ThickFunction2 {
+  var function: (Int, String) -> Void
+}
+
+/// Wraps a thick function with arity 3.
+struct ThickFunction3 {
+  var function: (Int, String, AnyObject?) -> Void
+}
+
+struct ThickFunctionParts {
+  var function: UnsafeRawPointer
+  var context: Optional<UnsafeRawPointer>
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: @escaping () -> Void) {
+  let fn = UnsafeMutablePointer<ThickFunction0>.allocate(
+    capacity: MemoryLayout<ThickFunction0>.size)
+  fn.initialize(to: ThickFunction0(function: function))
+
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocate()
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: @escaping (Int) -> Void) {
+  let fn =
+  UnsafeMutablePointer<ThickFunction1>.allocate(
+    capacity: MemoryLayout<ThickFunction1>.size)
+  fn.initialize(to: ThickFunction1(function: function))
+
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocate()
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: @escaping (Int, String) -> Void) {
+  let fn = UnsafeMutablePointer<ThickFunction2>.allocate(
+      capacity: MemoryLayout<ThickFunction2>.size)
+  fn.initialize(to: ThickFunction2(function: function))
+
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocate()
+}
+
+/// Reflect a closure context. The given function must be a Swift-native
+/// @convention(thick) function value.
+public func reflect(function: @escaping (Int, String, AnyObject?) -> Void) {
+  let fn = UnsafeMutablePointer<ThickFunction3>.allocate(
+      capacity: MemoryLayout<ThickFunction3>.size)
+  fn.initialize(to: ThickFunction3(function: function))
+
+  let contextPointer = fn.withMemoryRebound(
+    to: ThickFunctionParts.self, capacity: 1) {
+      UInt(bitPattern: $0.pointee.context)
+  }
+
+  reflect(instanceAddress: contextPointer, kind: .Object)
+
+  fn.deallocate()
+}
+
+
+/// Reflect an AsyncTask.
+public func reflect(asyncTask: UInt) {
+  reflect(instanceAddress: asyncTask, kind: .AsyncTask)
 }
 
 /// Call this function to indicate to the parent that there are
 /// no more instances to look at.
 public func doneReflecting() {
-  sendValue(InstanceKind.None.rawValue)
+  reflect(instanceAddress: UInt(InstanceKind.None.rawValue), kind: .None)
 }
 
 /* Example usage

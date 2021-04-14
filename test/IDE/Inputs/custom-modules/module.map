@@ -16,6 +16,11 @@ module Newtype {
   header "Newtype.h"
 }
 
+module NewtypeObjC {
+  header "NewtypeObjC.h"
+  export *
+}
+
 module ImportAsMember {
   export *
 
@@ -30,11 +35,11 @@ module ImportAsMember {
   module C {
     requires objc
     header "ImportAsMemberC.h"
+    export *
   }
 
-  module Proto {
-    requires objc
-    header "ImportAsMemberProto.h"
+  module APINotes {
+    header "ImportAsMemberAPINotes.h"
   }
 
   module Class {
@@ -49,7 +54,8 @@ module IAMError {
   header "ImportAsMemberError.h"
 }
 
-module InferImportAsMember {
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
   export *
-  header "InferImportAsMember.h"
 }
+

@@ -8,7 +8,7 @@ import os
 import os.path
 import shutil
 
-from SwiftBuildSupport import check_call
+from swift_build_support.swift_build_support import shell
 
 
 def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):
@@ -63,6 +63,9 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
         if all([os.path.islink(item) for item in file_paths]):
             # It's a symlink in all found instances, copy the link.
             print("-- Creating symlink %s" % dest_path)
+            # Remove symlink if it already exists
+            if os.path.islink(dest_path):
+                os.remove(dest_path)
             os.symlink(os.readlink(file_paths[0]), dest_path)
         elif all([os.path.isdir(item) for item in file_paths]):
             # It's a subdir in all found instances.
@@ -89,8 +92,8 @@ def merge_lipo_files(src_root_dirs, file_list, copy_verbatim_subpaths,
                     print("-- Running lipo %s to %s" % (file_paths, dest_path))
                 else:
                     print("-- Running lipo %s" % dest_path)
-                check_call(lipo_cmd + ["-output", dest_path] + file_paths,
-                           print_command=verbose, verbose=verbose)
+                shell.call(lipo_cmd + ["-output", dest_path] + file_paths,
+                           echo=verbose)
             else:
                 # Multiple instances are different, and they're not executable.
                 print(

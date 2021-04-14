@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -17,59 +17,74 @@
 #ifndef SWIFT_AST_REQUIREMENT_H
 #define SWIFT_AST_REQUIREMENT_H
 
+#include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/RequirementBase.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Debug.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
-/// Describes the kind of a requirement that occurs within a requirements
-/// clause.
-enum class RequirementKind : unsigned {
-  /// A conformance requirement T : P, where T is a type that depends
-  /// on a generic parameter and P is a protocol to which T must conform.
-  Conformance,
-  /// A superclass requirement T : C, where T is a type that depends
-  /// on a generic parameter and C is a concrete class type which T must
-  /// equal or be a subclass of.
-  Superclass,
-  /// A same-type requirement T == U, where T and U are types that shall be
-  /// equivalent.
-  SameType,
-  /// A marker that indicates where the witness for the given (first)
-  /// type should be located.
-  ///
-  /// FIXME: This is a crutch used to help us eliminate various walks over
-  /// "all archetypes".
-  WitnessMarker
-
-  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
-  // when adding enumerators.
-};
-
-/// \brief A single requirement placed on the type parameters (or associated
+/// A single requirement placed on the type parameters (or associated
 /// types thereof) of a
-class Requirement {
-  llvm::PointerIntPair<Type, 2, RequirementKind> FirstTypeAndKind;
-  Type SecondType;
-
+class Requirement
+    : public RequirementBase<Type,
+                             llvm::PointerIntPair<Type, 3, RequirementKind>,
+                             LayoutConstraint> {
 public:
   /// Create a conformance or same-type requirement.
   Requirement(RequirementKind kind, Type first, Type second)
-    : FirstTypeAndKind(first, kind), SecondType(second) { }
+      : RequirementBase(kind, first, second) {}
 
-  /// \brief Determine the kind of requirement.
-  RequirementKind getKind() const { return FirstTypeAndKind.getInt(); }
+  /// Create a layout constraint requirement.
+  Requirement(RequirementKind kind, Type first, LayoutConstraint second)
+    : RequirementBase(kind, first, second) {}
 
-  /// \brief Retrieve the first type.
-  Type getFirstType() const {
-    return FirstTypeAndKind.getPointer();
+  /// Whether this requirement is in its canonical form.
+  bool isCanonical() const;
+
+  /// Get the canonical form of this requirement.
+  Requirement getCanonical() const;
+
+  /// Subst the types involved in this requirement.
+  ///
+  /// The \c args arguments are passed through to Type::subst. This doesn't
+  /// touch the superclasses, protocols or layout constraints.
+  template <typename ...Args>
+  llvm::Optional<Requirement> subst(Args &&...args) const {
+    auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
+    if (newFirst->hasError())
+      return None;
+
+    switch (getKind()) {
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType: {
+      auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
+      if (newSecond->hasError())
+        return None;
+      return Requirement(getKind(), newFirst, newSecond);
+    }
+    case RequirementKind::Layout:
+      return Requirement(getKind(), newFirst, getLayoutConstraint());
+    }
+
+    llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
-  /// \brief Retrieve the second type.
-  Type getSecondType() const {
-    return SecondType;
-  }
+  ProtocolDecl *getProtocolDecl() const;
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &out) const;
+  void print(raw_ostream &os, const PrintOptions &opts) const;
+  void print(ASTPrinter &printer, const PrintOptions &opts) const;
 };
+
+inline void simple_display(llvm::raw_ostream &out, const Requirement &req) {
+  req.print(out, PrintOptions());
+}
 
 } // end namespace swift
 

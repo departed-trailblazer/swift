@@ -2,11 +2,11 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2016 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 //
@@ -20,25 +20,36 @@
 
 #include <pthread.h>
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include <os/lock.h>
+#define HAS_OS_UNFAIR_LOCK 1
+#endif
+
 namespace swift {
 
 typedef pthread_cond_t ConditionHandle;
-typedef pthread_mutex_t MutexHandle;
+typedef pthread_mutex_t ConditionMutexHandle;
 typedef pthread_rwlock_t ReadWriteLockHandle;
 
-#if defined(__CYGWIN__) || defined(__ANDROID__)
+#if HAS_OS_UNFAIR_LOCK
+typedef os_unfair_lock MutexHandle;
+#else
+typedef pthread_mutex_t MutexHandle;
+#endif
+
+#if defined(__CYGWIN__) || defined(__ANDROID__) || defined(__HAIKU__) || defined(__wasi__)
 // At the moment CYGWIN pthreads implementation doesn't support the use of
 // constexpr for static allocation versions. The way they define things
 // results in a reinterpret_cast which violates constexpr. Similarly, Android's
 // pthread implementation makes use of volatile attributes that prevent it from
-// being marked as constexpr.
-#define CONDITION_SUPPORTS_CONSTEXPR 0
-#define MUTEX_SUPPORTS_CONSTEXPR 0
-#define READWRITELOCK_SUPPORTS_CONSTEXPR 0
+// being marked as constexpr. WASI currently doesn't support threading/locking at all.
+#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 0
+#define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 0
+#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 0
 #else
-#define CONDITION_SUPPORTS_CONSTEXPR 1
-#define MUTEX_SUPPORTS_CONSTEXPR 1
-#define READWRITELOCK_SUPPORTS_CONSTEXPR 1
+#define SWIFT_CONDITION_SUPPORTS_CONSTEXPR 1
+#define SWIFT_MUTEX_SUPPORTS_CONSTEXPR 1
+#define SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR 1
 #endif
 
 /// PThread low-level implementation that supports ConditionVariable
@@ -46,7 +57,7 @@ typedef pthread_rwlock_t ReadWriteLockHandle;
 ///
 /// See ConditionVariable
 struct ConditionPlatformHelper {
-#if CONDITION_SUPPORTS_CONSTEXPR
+#if SWIFT_CONDITION_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static
@@ -59,7 +70,7 @@ struct ConditionPlatformHelper {
   static void destroy(ConditionHandle &condition);
   static void notifyOne(ConditionHandle &condition);
   static void notifyAll(ConditionHandle &condition);
-  static void wait(ConditionHandle &condition, MutexHandle &mutex);
+  static void wait(ConditionHandle &condition, ConditionMutexHandle &mutex);
 };
 
 /// PThread low-level implementation that supports Mutex
@@ -67,26 +78,53 @@ struct ConditionPlatformHelper {
 ///
 /// See Mutex
 struct MutexPlatformHelper {
-#if MUTEX_SUPPORTS_CONSTEXPR
+#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static
 #endif
-      MutexHandle
-      staticInit() {
+      ConditionMutexHandle
+      conditionStaticInit() {
     return PTHREAD_MUTEX_INITIALIZER;
   };
+#if SWIFT_MUTEX_SUPPORTS_CONSTEXPR
+  static constexpr
+#else
+  static
+#endif
+  MutexHandle
+  staticInit() {
+#if HAS_OS_UNFAIR_LOCK
+    return OS_UNFAIR_LOCK_INIT;
+#else
+    return PTHREAD_MUTEX_INITIALIZER;
+#endif  
+  }
+  static void init(ConditionMutexHandle &mutex, bool checked = false);
+  static void destroy(ConditionMutexHandle &mutex);
+  static void lock(ConditionMutexHandle &mutex);
+  static void unlock(ConditionMutexHandle &mutex);
+  static bool try_lock(ConditionMutexHandle &mutex);
+
+  // The ConditionMutexHandle versions handle everything on-Apple platforms.
+#if HAS_OS_UNFAIR_LOCK
+
   static void init(MutexHandle &mutex, bool checked = false);
   static void destroy(MutexHandle &mutex);
   static void lock(MutexHandle &mutex);
   static void unlock(MutexHandle &mutex);
   static bool try_lock(MutexHandle &mutex);
 
+  // os_unfair_lock always checks for errors, so just call through.
+  static void unsafeLock(MutexHandle &mutex) { lock(mutex); }
+  static void unsafeUnlock(MutexHandle &mutex) { unlock(mutex); }
+#endif
+
   // The unsafe versions don't do error checking.
-  static void unsafeLock(MutexHandle &mutex) {
+  static void unsafeLock(ConditionMutexHandle &mutex) {
     (void)pthread_mutex_lock(&mutex);
   }
-  static void unsafeUnlock(MutexHandle &mutex) {
+  static void unsafeUnlock(ConditionMutexHandle &mutex) {
     (void)pthread_mutex_unlock(&mutex);
   }
 };
@@ -96,7 +134,7 @@ struct MutexPlatformHelper {
 ///
 /// See ReadWriteLock
 struct ReadWriteLockPlatformHelper {
-#if READWRITELOCK_SUPPORTS_CONSTEXPR
+#if SWIFT_READWRITELOCK_SUPPORTS_CONSTEXPR
   static constexpr
 #else
   static

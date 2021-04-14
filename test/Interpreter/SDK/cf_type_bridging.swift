@@ -3,15 +3,16 @@
 
 // REQUIRES: objc_interop
 
-#if os(OSX)
+#if canImport(AppKit)
 import AppKit
-#endif
-#if os(iOS) || os(tvOS) || os(watchOS)
+#elseif canImport(UIKit)
 import UIKit
+#else
+#error("Unsupported platform")
 #endif
 
 let foo: [CGColor] =
-  [CGColor(withColorSpace: CGColorSpaceCreateDeviceRGB(),
+  [CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
 	         components: [1.0, 0.0, 0.0, 1.0])!]
 
 let bar = foo as NSArray

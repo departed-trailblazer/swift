@@ -1,8 +1,8 @@
-// RUN: rm -rf %t
-// RUN: mkdir -p %t
+// RUN: %empty-directory(%t)
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
 // RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ %t/ObjCClasses.o %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // REQUIRES: executable_test
@@ -17,8 +17,8 @@ var ImportedObjCGenerics = TestSuite("ImportedObjCGenerics")
 ImportedObjCGenerics.test("Creation") {
   let cs = Container<NSString>(object: "i-just-met-you")
   expectEqual("i-just-met-you", cs.object)
-  expectTrue(cs.dynamicType === Container<NSString>.self)
-  expectTrue(cs.dynamicType === Container<AnyObject>.self)
+  expectTrue(type(of: cs) === Container<NSString>.self)
+  expectTrue(type(of: cs) === Container<AnyObject>.self)
 }
 
 ImportedObjCGenerics.test("Blocks") {
@@ -105,14 +105,14 @@ ImportedObjCGenerics.test("ProtocolConstraints") {
 }
 
 ImportedObjCGenerics.test("ClassConstraints") {
-  func makeContainedAnimalMakeNoise<T>(_ x: AnimalContainer<T>) -> NSString {
-    return x.object.noise
+  func makeContainedAnimalMakeNoise<T>(x: AnimalContainer<T>) -> NSString {
+    return x.object.noise as NSString
   }
   let petCarrier = AnimalContainer(object: Dog())
-  expectEqual("woof", makeContainedAnimalMakeNoise(petCarrier))
+  expectEqual("woof", makeContainedAnimalMakeNoise(x: petCarrier))
 }
 
-class ClassWithMethodsUsingObjCGenerics: NSObject {
+@objc @objcMembers class ClassWithMethodsUsingObjCGenerics: NSObject {
   func copyContainer(_ x: CopyingContainer<NSString>) -> CopyingContainer<NSString> {
     return x
   }
@@ -139,7 +139,7 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   // Test NSObject methods inherited into Container<>
   let gc = Container<NSString>(object: "")
   expectTrue(gc.description.range(of: "Container") != nil)
-  expectTrue(gc.dynamicType.superclass() == NSObject.self)
+  expectTrue(type(of: gc).superclass() == NSObject.self)
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
@@ -147,20 +147,20 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
 
 public class InheritInSwift: Container<NSString> {
   public override init(object: NSString) {
-    super.init(object: object.lowercased)
+    super.init(object: object.lowercased as NSString)
   }
   public override var object: NSString {
     get {
-      return super.object.uppercased
+      return super.object.uppercased as NSString
     }
     set {
-      super.object = newValue.lowercased
+      super.object = newValue.lowercased as NSString
     }
   }
 
   public var superObject: NSString {
     get {
-      return super.object
+      return super.object as NSString
     }
   }
 }
@@ -186,6 +186,12 @@ ImportedObjCGenerics.test("InheritInSwift") {
   expectEqual(s.superObject, "aloha")
   expectEqual(s.object, "ALOHA")
   expectEqual(sup.object, "ALOHA")
+}
+
+ImportedObjCGenerics.test("BridgedInitializer") {
+  let strings: [NSString] = ["hello", "world"]
+  let s = BridgedInitializer(array: strings)
+  expectEqual(s.count, 2)
 }
 
 runAllTests()

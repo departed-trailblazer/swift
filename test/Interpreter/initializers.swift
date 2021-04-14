@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-run-simple-swift(-swift-version 4) | %FileCheck %s
+// RUN: %target-run-simple-swift(-swift-version 5) | %FileCheck %s
+
 // REQUIRES: executable_test
 
 // Test initialization and initializer inheritance.
@@ -100,7 +102,7 @@ C()
 
 // rdar://problem/18877135
 
-class Foo: FloatLiteralConvertible {
+class Foo: ExpressibleByFloatLiteral {
   required init(floatLiteral: Float) { }
 
   func identify() { print("Foo") }
